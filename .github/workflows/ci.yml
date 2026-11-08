@@ -15,22 +15,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK 26
-        uses: actions/setup-java@v4
+      - name: Verify Docker
+        run: |
+          docker version
+          docker info
+
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '26'
           cache: maven
 
-      - name: Verify Java version
-        run: |
-          java -version
-          mvn -version
-
       - name: Unit + API + concurrency tests
         run: mvn -B clean verify
 
-      - name: Race test x10 (flakiness guard)
+      - name: Race test x10
         run: |
           for i in $(seq 1 10); do
             echo "=== race run $i ==="
@@ -60,4 +59,3 @@ jobs:
 
       - run: npm ci
       - run: npm run build
-
