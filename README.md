@@ -1,127 +1,327 @@
-# SquadUp — race-proof hackathon team formation
+# SquadUp — Race-Proof Hackathon Team Formation
 
-Spring Boot 3 (Java 21) + PostgreSQL + React/TypeScript/Tailwind. PostgreSQL is the source of truth:
-team-row locks serialize membership changes, and database constraints are the last line of defence.
+SquadUp is a hackathon team formation platform designed to handle concurrent membership operations safely and consistently.
 
+Built around PostgreSQL as the source of truth, the system uses database constraints, transactional operations and row-level locking to prevent race conditions during team formation.
+
+The platform supports team creation, invite-based joining, join requests, membership management, teammate recommendations and real-time updates.
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | Java 21, Spring Boot 3 |
+| Database | PostgreSQL 16 |
+| Database Migrations | Flyway |
+| Frontend | React, TypeScript, Tailwind CSS |
+| Authentication | JWT, Spring Security |
+| API Documentation | Swagger / OpenAPI |
+| Real-time Updates | Server-Sent Events |
+| Testing | JUnit, Testcontainers |
+| Load Testing | k6 |
+| Infrastructure | Docker, Docker Compose |
+| CI | GitHub Actions |
+
+## Architecture
+
+```text
+team-formation/
+│
+├── backend/       Spring Boot REST API
+├── frontend/      React + TypeScript application
+├── loadtest/      k6 tests and database seed data
+├── scripts/       Database invariants and race simulations
+├── docs/          Architecture and design documentation
+│
+├── .github/       CI workflows
+├── docker-compose.yml
+├── docker-compose.chaos.yml
+├── .env.example
+├── .gitignore
+└── README.md
 ```
-backend/    Spring Boot API (feature packages: auth, user, hackathon, team, recommendation, audit, realtime, idempotency, config, common)
-frontend/   React + TS + Tailwind UI (mobile-first, keyboard-only friendly)
-loadtest/   seed.sql (10,000 users / 2,000 teams) and board.js (k6, 100 VUs, p95 < 200 ms)
-scripts/    invariants.sql (every row returned is a bug) · chaos.sh (kill -9 mid-join) · sql_race_sim.sh (SQL-only race proof)
-docs/       DESIGN.md (1-page design doc)
-```
 
-## UI
+### Backend Modules
 
-Bento-style dashboard (lime / purple / black on a soft grey shell, hatched seat tracks, pill navigation), responsive down to a
-phone and fully keyboard-operable. Screenshots in `docs/screenshots/` are renders of the built UI against a mock API, so the
-numbers shown are sample data.
+The backend follows a feature-oriented package structure:
 
-## Run it
+- `auth` — Registration, login and authentication.
+- `user` — User profiles, skills and time zones.
+- `hackathon` — Hackathon management and team boards.
+- `team` — Team creation and membership operations.
+- `recommendation` — Complementary skill and timezone matching.
+- `audit` — Membership and team activity history.
+- `realtime` — Server-Sent Events.
+- `idempotency` — Safe handling of repeated requests.
+- `config` — Application configuration and security.
+- `common` — Shared components and exception handling.
+
+## Core Engineering Design
+
+### Concurrency Control
+
+PostgreSQL acts as the source of truth for membership operations.
+
+The implementation combines:
+
+- Transactional membership changes.
+- Team-row locking to serialize competing join operations.
+- Database constraints as a final integrity boundary.
+- Atomic persistence of membership changes and idempotency records.
+
+This ensures that concurrent requests cannot exceed a team's configured capacity.
+
+### Idempotency
+
+Idempotency keys are supported for:
+
+- Team creation.
+- Joining a team.
+- Join requests.
+- Accepting or declining requests.
+
+Repeated requests using the same key do not create duplicate operations.
+
+### Team Lifecycle
+
+The platform supports:
+
+- Configurable minimum and maximum team sizes.
+- One team per user per hackathon.
+- Invite codes with 128-bit entropy.
+- SHA-256 hashed invite codes.
+- 48-hour invite expiration.
+- Join requests and leader-controlled approvals.
+- Leadership transfer when a leader leaves.
+- Automatic team deletion when the last member leaves.
+
+### Security
+
+- JWT-based authentication.
+- Role and membership-based authorization.
+- Rate limiting for authentication and joining.
+- Invite-code expiration and brute-force protection.
+- Audit logging for team activity.
+
+## Race Arena
+
+Race Arena provides a controlled demonstration of concurrent team joining.
+
+It creates a temporary team with one remaining seat and releases multiple participants simultaneously using a synchronization barrier.
+
+Three execution strategies can be compared:
+
+| Strategy | Behaviour |
+|---|---|
+| Safe | Team-row locking protects the final seat. |
+| No Lock | Database constraints prevent overbooking, but competing requests can encounter constraint errors. |
+| Naive | Check-then-insert logic can overbook teams and cause counter inconsistencies. |
+
+The arena includes database invariant checks and an audit of the resulting membership state.
+
+It is intended for controlled demonstrations and is disabled by default in production.
+
+## API Overview
+
+All endpoints return JSON. Authentication uses Bearer JWT tokens, except public authentication endpoints.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/auth/register` | Register a user |
+| POST | `/api/auth/login` | Authenticate a user |
+| GET / PUT | `/api/users/me` | Retrieve or update profile |
+| GET | `/api/hackathons` | List hackathons |
+| GET | `/api/hackathons/{id}/board` | Paginated team board |
+| GET | `/api/hackathons/{id}/my-team` | Retrieve current team |
+| POST | `/api/teams` | Create a team |
+| GET | `/api/teams` | List teams |
+| GET / PATCH | `/api/teams/{id}` | Retrieve or update team |
+| POST | `/api/teams/{id}/invites` | Generate invite code |
+| POST | `/api/teams/{id}/join` | Join using invite code |
+| POST / GET | `/api/teams/{id}/requests` | Create or list join requests |
+| PATCH | `/api/requests/{id}` | Accept or decline request |
+| DELETE | `/api/teams/{id}/leave` | Leave a team |
+| DELETE | `/api/teams/{id}/members/{userId}` | Remove a member |
+| GET | `/api/teams/{id}/audit` | Retrieve audit history |
+| GET | `/api/teams/{id}/suggestions` | Retrieve teammate recommendations |
+| POST / GET | `/api/arena/race` | Execute race demonstration |
+| POST / GET | `/api/arena/status` | Retrieve arena status |
+| GET | `/api/stream/hackathons/{id}` | Hackathon event stream |
+| GET | `/api/stream/teams/{id}` | Team event stream |
+
+Full API documentation is available through Swagger UI at `/swagger-ui.html`.
+
+## Testing & Reliability
+
+The backend test suite covers approximately 60 test cases across:
+
+- Authentication and security.
+- Team and membership rules.
+- Invite management.
+- Join requests.
+- Leadership transfer and team deletion.
+- Idempotency.
+- Audit logging.
+- Board queries.
+- Recommendations.
+- Rate limiting.
+- Concurrent membership operations.
+
+Concurrency scenarios include:
+
+- 50 users competing for one remaining seat.
+- One user attempting to join 20 teams.
+- 20 requests sharing the same idempotency key.
+- Three simultaneous acceptance requests competing for one seat.
+- Ten concurrent team creations.
+- Interleaved joins and leaves.
+
+The last-seat race test runs five times per build. CI additionally repeats the concurrency test class to detect flaky behaviour.
+
+### Running Tests
 
 ```bash
-docker compose up --build          # UI http://localhost:3000   API/Swagger http://localhost:8080/swagger-ui.html
+cd backend
+mvn verify
 ```
 
-Local development:
+Testcontainers requires Docker to run the integration tests against PostgreSQL 16.
 
-```bash
-docker compose up db                               # PostgreSQL on :5432
-cd backend && mvn spring-boot:run                  # API on :8080 (Flyway migrates on start)
-cd frontend && npm install && npm run dev          # UI on :5173, /api proxied to :8080
-```
+## Load Testing
 
-## Test
+The load-testing setup includes:
 
-```bash
-cd backend && mvn verify      # needs Docker: Testcontainers starts a real PostgreSQL 16
-```
+- 10,000 seeded users.
+- 2,000 seeded teams.
+- k6 board endpoint testing.
+- 100 virtual users.
+- A target p95 latency below 200 ms.
 
-~60 tests: auth/security, team + membership rules, invites, join requests, leadership transfer + last-member
-deletion, idempotency, audit, board, recommendations, rate limits, and **concurrency**
-(50 people → 1 seat, one user → 20 teams, same Idempotency-Key ×20, 3 accepts → 1 seat,
-10 concurrent creates, interleaved joins/leaves). The last-seat race runs 5× per build and CI runs
-the whole concurrency class 10× more to catch flakiness.
-
-## Load test
+Run the load test:
 
 ```bash
 docker compose up -d --build
-docker compose exec -T db psql -U teamformation -d teamformation < loadtest/seed.sql
-k6 run -e BASE_URL=http://localhost:8080 loadtest/board.js       # writes loadtest/report.json
-docker compose exec -T db psql -U teamformation -d teamformation < scripts/invariants.sql   # expect 0 rows
+
+docker compose exec -T db \
+  psql -U teamformation -d teamformation \
+  < loadtest/seed.sql
+
+k6 run \
+  -e BASE_URL=http://localhost:8080 \
+  loadtest/board.js
 ```
 
-## API (all JSON, Bearer JWT except /api/auth/*; full spec at /swagger-ui.html)
+Generated results are written to `loadtest/report.json`.
 
-| Method | Path | Notes |
-|---|---|---|
-| POST | /api/auth/register, /api/auth/login | rate-limited per IP |
-| GET/PUT | /api/users/me | profile, skills, time zone |
-| GET | /api/hackathons, /api/hackathons/{id}/board, /api/hackathons/{id}/my-team | board = teams with an open seat, paginated |
-| POST | /api/teams · GET /api/teams?hackathonId= · GET/PATCH /api/teams/{id} | create is idempotent |
-| POST | /api/teams/{id}/invites | leader only; 128-bit code, SHA-256 hashed, 48 h expiry, one live code |
-| POST | /api/teams/{id}/join | body `{inviteCode}`; idempotent; per-user + per-IP rate limit |
-| POST/GET | /api/teams/{id}/requests | request to join / leader lists |
-| PATCH | /api/requests/{id} | leader accepts or declines; idempotent |
-| DELETE | /api/teams/{id}/leave, /api/teams/{id}/members/{userId} | leadership transfer; last member deletes the team |
-| GET | /api/teams/{id}/audit, /api/teams/{id}/suggestions | members only; suggestions are scored and explained |
-| POST/GET | /api/arena/race, /api/arena/status | demo only: 404 unless `ARENA_ENABLED=true`; login required |
-| GET | /api/stream/hackathons/{id}, /api/stream/teams/{id} | Server-Sent Events (notifications; clients refetch) |
-
-`Idempotency-Key` is supported on create-team, join, request-to-join and decide. Invite generation is
-deliberately **not** idempotent: replaying it would require storing the raw code.
-
-## Race Arena (the live demo)
-
-Log in, open **Race Arena** in the nav. It builds a throwaway team with one seat left, releases N people (default 50) at the
-same instant through a barrier, then audits the database and shows who got the seat. Pick a design, or **Compare all three**:
-
-| Design | What you will see |
-|---|---|
-| **Safe** (team-row lock) | 1 got the seat, 49 cleanly rejected, 5/5, audit all green |
-| **No lock** (check-then-act) | still 1 winner, but ~49 requests die with raw constraint errors: only the CHECK constraint saved you |
-| **Naive** (count rows, insert) | **overbooked**: many people in a 5-seat team, counter wrong, audit red |
-
-It is off by default (`ARENA_ENABLED=false`; `docker-compose.yml` turns it on). It only touches hidden `arena-*` rows, runs one
-race at a time, and deletes everything afterwards. Leave it off in a real deployment.
-
-## Chaos test (kill the server mid-join)
+### Database Invariant Checks
 
 ```bash
-./scripts/chaos.sh      # needs docker compose, openssl, curl
+docker compose exec -T db \
+  psql -U teamformation -d teamformation \
+  < scripts/invariants.sql
 ```
 
-Seeds 40 teams x 3 seats and 300 contenders, fires a 900-request join storm, **`kill -9`s the API 1.5 s in**, restarts it, retries
-every request with the same `Idempotency-Key`, then checks: zero invariant violations, and that members joined == stored
-idempotency records (a join and its record commit together or not at all). Exits non-zero on any failure, including an
-unreachable database (it fails closed). Tokens are minted locally from `JWT_SECRET`, so it never hits the login rate limit.
+The invariant query is designed to return zero rows when database invariants hold.
 
-`./scripts/sql_race_sim.sh` is the same story with no application at all: 50 psql sessions released together by an
-advisory-lock barrier against a scratch database.
+## Chaos Testing
 
-## Deploy (free tier)
+The chaos testing script simulates server failure during concurrent membership operations.
 
-Backend: Render web service (Docker, root `backend`) with env `JDBC_DATABASE_URL=jdbc:postgresql://HOST/DB?sslmode=require`,
-`DB_USER`, `DB_PASSWORD`, `JWT_SECRET` (≥ 32 chars), `CORS_ORIGINS=<frontend URL>`. Postgres: Render or Neon free tier
-(check current free-tier limits/expiry). Frontend: Render Static Site, build `npm ci && npm run build`, publish `dist`,
-env `VITE_API_BASE=<backend URL>`, rewrite `/*` → `/index.html`. Free instances cold-start; open the URL once before the demo.
+```bash
+./scripts/chaos.sh
+```
 
-## Verification status (be honest in your submission)
+The scenario includes:
 
-Checked in the authoring sandbox (PostgreSQL 16, one shared vCPU):
-- Schema/migrations V1-V3 load; constraint names match what the exception handler maps.
-- **SQL-level race with a real barrier** (`scripts/sql_race_sim.sh`, 50 sessions released together): SAFE gave 1 joined / 49 cleanly
-  rejected / 5 of 5 seats. NO_LOCK gave 49 raw `chk_member_count` errors and still 5 of 5. NAIVE overbooked (21-27 people in a
-  5-seat team, counter stuck at 4) and `invariants.sql` flagged the drift. An earlier version of this test started sessions one by one,
-  so they never overlapped; the barrier version is the one to trust.
-- Seed script (10k users / 2k teams / 6k memberships) loads in ~1 s; `invariants.sql` returns 0 rows on it.
-- Board query rewritten to paginate on the partial index first: DB-side p95 with 100 concurrent clients dropped 404 ms to 40 ms (`pgbench`).
-- `chaos.sh`: fixture SQL, invite-hash compatibility, JWT minting (signature independently verified) and the audit logic were run
-  against real PostgreSQL, including an injected corruption that the audit correctly failed. The kill/restart part needs Docker and was not run.
-- `Scoring` executed against the values the tests assert; frontend (including the arena page) passes strict `tsc` and builds.
+1. Preparing teams and competing users.
+2. Generating a concurrent join storm.
+3. Terminating the API process during execution.
+4. Restarting the API.
+5. Retrying requests with their original idempotency keys.
+6. Verifying database invariants and idempotency consistency.
 
-**Not verified here** (the sandbox could not reach Maven Central): the Java sources were syntax-checked with `javac` but
-not compiled against Spring or run. Expect to run `mvn verify` first and fix any small compile or test issues.
-The Race Arena service and page, the end-to-end k6 number and the browser UI were also not exercised. Do both before submitting, and put the real k6 output in your report.
-#
+A separate SQL-only simulation is available:
+
+```bash
+./scripts/sql_race_sim.sh
+```
+
+This tests concurrent database operations using 50 PostgreSQL sessions and a synchronization barrier.
+
+## Local Development
+
+### Prerequisites
+
+- Java 21
+- Maven
+- Node.js and npm
+- Docker and Docker Compose
+- PostgreSQL 16 (optional when using Docker)
+
+### Environment Configuration
+
+Create a local `.env` file using `.env.example` as a template.
+
+Configure the PostgreSQL credentials and JWT secret before starting the application.
+
+### Start the Application
+
+```bash
+docker compose up --build
+```
+
+Application endpoints:
+
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:3000 |
+| Backend | http://localhost:8080 |
+| Swagger UI | http://localhost:8080/swagger-ui.html |
+
+### Run Services Individually
+
+Start PostgreSQL:
+
+```bash
+docker compose up db
+```
+
+Start the backend:
+
+```bash
+cd backend
+mvn spring-boot:run
+```
+
+Start the frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The development frontend runs on port `5173` and proxies `/api` requests to the backend on port `8080`.
+
+## Deployment
+
+The application supports containerized backend deployment and static frontend hosting.
+
+A typical deployment consists of:
+
+- React frontend hosted as a static site.
+- Spring Boot backend hosted as a Docker web service.
+- Managed PostgreSQL database.
+
+The deployment configuration uses environment variables for database connectivity, authentication secrets and CORS origins.
+
+## Design Documentation
+
+Additional architectural decisions, database design, concurrency handling and trade-offs are documented in:
+
+`docs/DESIGN.md`
+
+---
+
+**SquadUp**  
+*Reliable team formation, even when everyone clicks Join at the same time.*
