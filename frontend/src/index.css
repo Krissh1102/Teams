@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+body { @apply bg-[#e4e4e6] font-sans text-ink antialiased; }
+/* Visible keyboard focus on light AND dark surfaces */
+:focus-visible { outline: 3px solid #6d4aff; outline-offset: 2px; border-radius: 12px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+@layer components {
+  .btn { @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50; }
+  .btn-primary { @apply btn bg-ink text-white hover:bg-neutral-800; }
+  .btn-lime { @apply btn bg-lime text-ink hover:brightness-95; }
+  .btn-secondary { @apply btn border border-neutral-300 bg-white text-ink hover:bg-fog; }
+  .btn-danger { @apply btn border border-coral/50 bg-white text-[#b3002b] hover:bg-red-50; }
+  .input { @apply min-h-[44px] w-full rounded-2xl border border-neutral-300 bg-white px-4 py-2 text-base text-ink placeholder:text-neutral-500; }
+  .card { @apply rounded-3xl bg-white p-5; }
+  .card-dark { @apply rounded-3xl bg-ink p-5 text-white; }
+  .chip { @apply inline-block rounded-full bg-fog px-2.5 py-0.5 text-xs font-semibold text-ink; }
+  .hatch { background-color: #ececec; background-image: repeating-linear-gradient(135deg, rgba(17,17,17,.08) 0 2px, transparent 2px 7px); }
+  .pill-nav { @apply inline-flex h-12 items-center whitespace-nowrap rounded-full px-6 text-sm font-semibold transition sm:h-14 sm:px-8; }
+  .h-title { @apply text-4xl font-medium tracking-tight sm:text-6xl; }
+}

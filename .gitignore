@@ -1,0 +1,12 @@
+node_modules/
+dist/
+target/
+.idea/
+.vscode/
+*.log
+loadtest/report.json
+.env
+.env.*
+!.env.example
+docs/screenshots/
+docs/DEMO_SCRIPT.md

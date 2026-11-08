@@ -1,0 +1,5 @@
+app:
+  rate-limit:
+    auth-per-minute-per-ip: 100000
+    join-per-minute-per-user: 100000
+    join-per-minute-per-ip: 100000
