@@ -18,7 +18,7 @@ export default function App() {
       <div className="mx-auto max-w-[1320px] bg-canvas p-4 sm:rounded-[2.5rem] sm:p-8 sm:shadow-[0_40px_90px_-40px_rgba(0,0,0,.35)]">
         <header className="mb-6 flex flex-wrap items-center gap-3">
           <Link to="/" className="inline-flex h-12 items-center gap-2 rounded-full bg-lime pl-1.5 pr-5 text-lg font-extrabold tracking-tight sm:h-14">
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-ink text-lime sm:h-11 sm:w-11"><Logo /></span>SquadUp
+            <span className="grid h-9 w-9 place-items-center rounded-full bg-ink text-lime sm:h-11 sm:w-11"><Logo /></span>Squad
           </Link>
           {user && (
             <>

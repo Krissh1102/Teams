@@ -1,6 +1,6 @@
-# SquadUp — Race-Proof Hackathon Team Formation
+# Squad — Race-Proof Hackathon Team Formation
 
-SquadUp is a hackathon team formation platform designed to handle concurrent membership operations safely and consistently.
+Squad is a hackathon team formation platform designed to handle concurrent membership operations safely and consistently.
 
 Built around PostgreSQL as the source of truth, the system uses database constraints, transactional operations and row-level locking to prevent race conditions during team formation.
 
@@ -323,5 +323,5 @@ Additional architectural decisions, database design, concurrency handling and tr
 
 ---
 
-**SquadUp**  
+**Squad**  
 *Reliable team formation, even when everyone clicks Join at the same time.*
