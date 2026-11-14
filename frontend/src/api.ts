@@ -1,4 +1,8 @@
 const BASE: string = import.meta.env.VITE_API_BASE ?? ''
+console.log('[API CONFIG]', {
+  base: BASE,
+  configured: Boolean(BASE),
+})
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string, public fields?: Record<string, string>) {
