@@ -10,7 +10,7 @@ The platform supports team creation, invite-based joining, join requests, member
 
 | Layer | Technology |
 |---|---|
-| Backend | Java 21, Spring Boot 3 |
+| Backend | Java 26, Spring Boot 3 |
 | Database | PostgreSQL 16 |
 | Database Migrations | Flyway |
 | Frontend | React, TypeScript, Tailwind CSS |
@@ -252,7 +252,7 @@ This tests concurrent database operations using 50 PostgreSQL sessions and a syn
 
 ### Prerequisites
 
-- Java 21
+- Java 26
 - Maven
 - Node.js and npm
 - Docker and Docker Compose
